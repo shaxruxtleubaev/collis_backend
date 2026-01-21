@@ -55,26 +55,3 @@ CSRF_COOKIE_HTTPONLY = True
 
 # Update JWT to use this SECRET_KEY
 SIMPLE_JWT['SIGNING_KEY'] = SECRET_KEY
-
-# Logging configuration for production
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'django_errors.log',
-        },
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['file', 'console'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-    },
-}
