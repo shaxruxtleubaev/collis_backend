@@ -1,180 +1,247 @@
-from rest_framework import viewsets
-from rest_framework import generics
+from rest_framework import viewsets, generics, status, filters
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from .serializers import (
     CourseSerializer, GroupSerializer, RoomSerializer,
     LecturerSerializer, StudentSerializer, UserProfileSerializer,
-    LessonSerializer, UserRegistrationSerializer,
-    DeviceSerializer, NotificationSerializer
+    LessonSerializer, NotificationSerializer, ChangePasswordSerializer
 )
 from .models import (
     Course, Group, Room,
     Lecturer, Student, Lesson,
-    UserProfile, Device, Notification
+    UserProfile, Notification
 )
 from .permissions import IsInstitutionAdmin, IsStaffOrReadOnly
-from .utils import create_lesson_notification
-
 
 # --- Foundation ViewSets ---
 
+@extend_schema_view(
+    list=extend_schema(description="List all courses"),
+    create=extend_schema(description="Create a new course (Admin only)"),
+    retrieve=extend_schema(description="Get course details"),
+    update=extend_schema(description="Update a course (Admin only)"),
+    destroy=extend_schema(description="Delete a course (Admin only)")
+)
 class CourseViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows Courses to be viewed or edited.
+    ViewSet for managing courses.
     """
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [IsAuthenticated, IsInstitutionAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'course_code']
+    ordering_fields = ['course_code', 'title', 'credits']
+    ordering = ['course_code']
 
+@extend_schema_view(
+    list=extend_schema(description="List all groups"),
+    create=extend_schema(description="Create a new group (Admin only)"),
+    retrieve=extend_schema(description="Get group details"),
+    update=extend_schema(description="Update a group (Admin only)"),
+    destroy=extend_schema(description="Delete a group (Admin only)")
+)
 class GroupViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows Groups to be viewed or edited.
+    ViewSet for managing student groups.
     """
-    queryset = Group.objects.all()
+    queryset = Group.objects.prefetch_related('students')
     serializer_class = GroupSerializer
     permission_classes = [IsAuthenticated, IsInstitutionAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['intake']
+    search_fields = ['name', 'intake']
+    ordering_fields = ['name', 'intake']
+    ordering = ['name']
 
+@extend_schema_view(
+    list=extend_schema(description="List all rooms"),
+    create=extend_schema(description="Create a new room (Admin only)"),
+    retrieve=extend_schema(description="Get room details"),
+    update=extend_schema(description="Update a room (Admin only)"),
+    destroy=extend_schema(description="Delete a room (Admin only)")
+)
 class RoomViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for Room management.
+    ViewSet for managing rooms.
     """
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticated, IsInstitutionAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['building']
+    search_fields = ['building', 'hall']
+    ordering_fields = ['building', 'hall', 'capacity']
+    ordering = ['building', 'hall']
 
 # --- Scheduling ViewSet ---
 
+@extend_schema_view(
+    list=extend_schema(
+        description="List lessons. Students see their group's lessons, lecturers see their lessons, admins see all.",
+        parameters=[
+            OpenApiParameter(name='date', description='Filter by date (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='lesson_type', description='Filter by lesson type', required=False, type=str),
+        ]
+    ),
+    create=extend_schema(description="Create a new lesson (Admin and Lecturer only)"),
+    retrieve=extend_schema(description="Get lesson details"),
+    update=extend_schema(description="Update a lesson (Admin and Lecturer only)"),
+    destroy=extend_schema(description="Delete a lesson (Admin and Lecturer only)")
+)
 class LessonViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for managing Lesson schedules.
-    Notification logic is now handled by Django Signals.
+    ViewSet for managing lessons.
+    
+    Personalized filtering:
+    - Students: See only their group's lessons
+    - Lecturers: See only their lessons
+    - Admins: See all lessons
     """
-    queryset = Lesson.objects.all().select_related('course', 'lecturer', 'group', 'room')
+    queryset = Lesson.objects.select_related('course', 'lecturer', 'room').prefetch_related('groups')
     serializer_class = LessonSerializer
     permission_classes = [IsAuthenticated, IsStaffOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['date', 'lesson_type', 'lecturer', 'course', 'room']
+    search_fields = ['course__title', 'course__course_code', 'lecturer__fullname']
+    ordering_fields = ['date', 'starting_time']
+    ordering = ['date', 'starting_time']
 
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        # Apply contextual filter for personalized schedules
         if self.request.user.is_authenticated and hasattr(self.request.user, 'userprofile'):
             profile = self.request.user.userprofile
             
-            if profile.user_type == 'STUDENT':
-                try:
-                    student = profile.student
-                    queryset = queryset.filter(group=student.group)
-                except Student.DoesNotExist:
-                    return queryset.none()
+            # Filter for Students
+            if profile.user_type == 'STUDENT' and hasattr(self.request.user, 'student'):
+                return queryset.filter(groups=self.request.user.student.group)
             
-            elif profile.user_type == 'LECTURER':
-                try:
-                    lecturer = profile.lecturer
-                    queryset = queryset.filter(lecturer=lecturer)
-                except Lecturer.DoesNotExist:
-                    return queryset.none()
+            # Filter for Lecturers
+            elif profile.user_type == 'LECTURER' and hasattr(self.request.user, 'lecturer'):
+                return queryset.filter(lecturer=self.request.user.lecturer)
         
-        # Order by date and time
-        return queryset.order_by('date', 'starting_time')
+        return queryset
+    
+    def perform_destroy(self, instance):
+        """Override to create notification before deletion"""
+        from .utils import create_lesson_notification
+        # Create cancellation notification BEFORE deleting
+        create_lesson_notification(instance, 'CANCELLATION')
+        # Now delete the lesson
+        super().perform_destroy(instance)
 
+# --- User ViewSets ---
 
-# --- User ViewSets and Registration ---
-
+@extend_schema_view(
+    list=extend_schema(description="List all user profiles"),
+    retrieve=extend_schema(description="Get user profile details"),
+)
 class UserProfileViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Allows authenticated users to view profiles.
+    ViewSet for viewing user profiles.
     """
-    queryset = UserProfile.objects.all().select_related('user')
+    queryset = UserProfile.objects.select_related('user')
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        description="Get the currently authenticated user's profile",
+        responses={200: UserProfileSerializer}
+    )
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """Get current user's profile"""
+        serializer = self.get_serializer(request.user.userprofile)
+        return Response(serializer.data)
+    
+    @extend_schema(
+        description="Change user password",
+        request=ChangePasswordSerializer,
+        responses={200: {"description": "Password changed successfully"}}
+    )
+    @action(detail=False, methods=['post'])
+    def change_password(self, request):
+        """Change password for current user"""
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Password changed successfully."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@extend_schema_view(
+    list=extend_schema(description="List all lecturers"),
+    retrieve=extend_schema(description="Get lecturer details"),
+)
 class LecturerViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Allows viewing of Lecturers.
+    ViewSet for viewing lecturers.
     """
-    queryset = Lecturer.objects.all().select_related('user_profile')
+    queryset = Lecturer.objects.all()
     serializer_class = LecturerSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['lecturer_id', 'fullname', 'email']
+    ordering_fields = ['lecturer_id', 'fullname']
+    ordering = ['lecturer_id']
 
+@extend_schema_view(
+    list=extend_schema(description="List all students"),
+    retrieve=extend_schema(description="Get student details"),
+)
 class StudentViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Allows viewing of Students.
+    ViewSet for viewing students.
     """
-    queryset = Student.objects.all().select_related('user_profile', 'group')
+    queryset = Student.objects.select_related('group')
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['group']
+    search_fields = ['student_id', 'fullname', 'email']
+    ordering_fields = ['student_id', 'fullname']
+    ordering = ['student_id']
 
-class UserRegistrationView(generics.CreateAPIView):
-    """
-    Custom endpoint for Student and Lecturer registration.
-    No authentication required.
-    """
-    serializer_class = UserRegistrationSerializer
-    
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        user = serializer.save()
-        
-        # Return a success message
-        return Response(
-            {"message": f"{serializer.validated_data['user_type']} registered successfully.", "username": user.username}, 
-            status=status.HTTP_201_CREATED
-        )
+# --- Notification ViewSet ---
 
-# --- Notification ViewSets ---
-
-class DeviceViewSet(viewsets.ModelViewSet):
-    """
-    Allows users to register their mobile devices for push notifications.
-    Each authenticated user manages their own devices.
-    """
-    queryset = Device.objects.all()
-    serializer_class = DeviceSerializer
-    permission_classes = [IsAuthenticated]
-
-    # Users can only see/manage their own devices
-    def get_queryset(self):
-        return self.queryset.filter(user_profile=self.request.user.userprofile)
-
-    def perform_create(self, serializer):
-        # Automatically link the device to the current user's profile
-        serializer.save(user_profile=self.request.user.userprofile)
-
-
+@extend_schema_view(
+    list=extend_schema(
+        description="List notifications. Students see notifications for their group's lessons, lecturers for their lessons."
+    ),
+    retrieve=extend_schema(description="Get notification details"),
+)
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Allows authenticated users to view their notification history.
+    ViewSet for viewing notifications.
+    
+    Personalized filtering:
+    - Students: See notifications for their group's lessons
+    - Lecturers: See notifications for their lessons
+    - Admins: See all notifications
     """
-    queryset = Notification.objects.all().order_by('-created_at')
+    queryset = Notification.objects.select_related('lesson__course', 'lesson__lecturer', 'lesson__room').prefetch_related('lesson__groups')
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['message_type', 'is_sent']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
 
     def get_queryset(self):
-        # Filter notifications relevant to the current user (Lecturer or Student)
-        user_profile = self.request.user.userprofile
+        """Filter notifications based on user type"""
+        user = self.request.user
         
-        # Base queryset: all notifications, ordered by creation time
-        queryset = self.queryset
-
-        if user_profile.user_type == 'STUDENT':
-            # Students get notifications for lessons assigned to their group
-            try:
-                group = user_profile.student.group
-                return queryset.filter(lesson__group=group)
-            except Student.DoesNotExist:
-                return queryset.none()
-
-        elif user_profile.user_type == 'LECTURER':
-            # Lecturers get notifications for lessons they are teaching
-            try:
-                lecturer = user_profile.lecturer
-                return queryset.filter(lesson__lecturer=lecturer)
-            except Lecturer.DoesNotExist:
-                return queryset.none()
+        if hasattr(user, 'userprofile'):
+            profile = user.userprofile
+            
+            if profile.user_type == 'STUDENT' and hasattr(user, 'student'):
+                return self.queryset.filter(lesson__groups=user.student.group)
+            
+            elif profile.user_type == 'LECTURER' and hasattr(user, 'lecturer'):
+                return self.queryset.filter(lesson__lecturer=user.lecturer)
         
-        # Admin sees all notifications (no filtering needed on the base queryset)
-        return queryset
+        # Admins see all
+        return self.queryset

@@ -1,18 +1,14 @@
 """
-Django settings for collis_backend project.
+Base settings for ColliS Backend - shared across all environments
 """
 
-import os
 from pathlib import Path
+from datetime import timedelta
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = 'django-insecure-some-secret-key' # Replace this in production
-
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
+# Application definition
 INSTALLED_APPS = [
     'jazzmin', 
     'django.contrib.admin',
@@ -22,16 +18,20 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
-    # Your apps
-    'timetable.apps.TimetableConfig', # <--- CHANGE HERE
+    # Third party apps
     'rest_framework',
-    'drf_spectacular'
+    'rest_framework_simplejwt',
+    'drf_spectacular',
+    'corsheaders',
+    'django_filters',
     
-    # ... any other apps ...
+    # Your apps
+    'timetable.apps.TimetableConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -60,110 +60,123 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'src.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3', # This will create a file named db.sqlite3 in the project root
-    }
-}
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
-# ... (other standard settings like AUTH_PASSWORD_VALIDATORS, LANGUAGE_CODE, etc.)
-
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Authentication Backends
+AUTHENTICATION_BACKENDS = [
+    'timetable.authentication.StudentLecturerAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# ----------------------------------------
+# JAZZMIN ADMIN CUSTOMIZATION
+# ----------------------------------------
+
 JAZZMIN_SETTINGS = {
-    # Site Configuration
     "site_title": "ColliS Timetable Admin",
     "site_header": "ColliS",
     "site_brand": "Scheduling System",
     "welcome_sign": "Welcome to the ColliS Scheduling Administration Panel",
     "copyright": "Timetable Management System",
-
-    # UI Customization
     "default_icon_parents": "fas fa-chevron-circle-right",
     "default_icon_children": "fas fa-circle",
     "theme": "flatly", 
-    "show_ui_builder": False, # Set to True initially to customize, then False for production
-    
-    # Specific format for TimeField input in admin
-    "time_format_field": "%H:%M", # Ensures time is shown/input as HH:MM
-    
-    # Menu Configuration (to keep admin clean)
+    "show_ui_builder": False,
     "order_with_respect_to": [
         "auth",
         "timetable",
-        "timetable.group",
-        "timetable.course",
-        "timetable.room",
-        "timetable.lecturer",
-        "timetable.student",
-        "timetable.lesson",
-        "timetable.notification",
     ],
 }
 
 # ----------------------------------------
-# 3. REST FRAMEWORK & AUTHENTICATION
+# REST FRAMEWORK SETTINGS
 # ----------------------------------------
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        # Use Simple JWT for all token-based API access
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        
-        # Include session authentication for use with the DRF browsable API and Admin
-        'rest_framework.authentication.SessionAuthentication', 
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        # Ensure only authenticated users can access the API by default
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
-    ),
+    ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'EXCEPTION_HANDLER': 'timetable.utils.custom_exception_handler',
 }
 
-
 # ----------------------------------------
-# 4. SIMPLE JWT SETTINGS
+# SIMPLE JWT SETTINGS
 # ----------------------------------------
 
-from datetime import timedelta
-
+# Will use SECRET_KEY from local.py or production.py
 SIMPLE_JWT = {
-    # Set the token expiration times
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), # Access token lasts 1 hour
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),   # Refresh token lasts 1 month
-    
-    # Allow users to submit credentials for new token pair
-    'ROTATE_REFRESH_TOKENS': True, 
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY, # Uses your existing Django SECRET_KEY
+    # SIGNING_KEY will be set to SECRET_KEY automatically
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
-
 # ----------------------------------------
-# 5. DRF SPECTACULAR (SWAGGER) SETTINGS
+# DRF SPECTACULAR (SWAGGER) SETTINGS
 # ----------------------------------------
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'ColliS Timetable Management API',
     'DESCRIPTION': 'API documentation for the ColliS Scheduling System, including lesson management, conflict detection, and user profiles.',
     'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False, # Serve UI separate from schema endpoint
-    # You can add JWT to the list of security schemes
-    'SECURITY': [
-        {
-            "Bearer Auth": [],
-        }
-    ],
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'defaultModelRendering': 'example',
         'tryItOutEnabled': True,
-    }
+        'persistAuthorization': True,
+    },
+    'SECURITY': [
+        {
+            'Bearer': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
+        }
+    ],
 }
