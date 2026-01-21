@@ -24,7 +24,7 @@ ALLOWED_HOSTS = ['*']
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'production.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -55,3 +55,4 @@ CSRF_COOKIE_HTTPONLY = True
 
 # Update JWT to use this SECRET_KEY
 SIMPLE_JWT['SIGNING_KEY'] = SECRET_KEY
+
