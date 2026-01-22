@@ -52,7 +52,3 @@ SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 
 # Note: PythonAnywhere supports HTTPS by default, so these should work fine
-
-# Update JWT to use this SECRET_KEY
-SIMPLE_JWT['SIGNING_KEY'] = SECRET_KEY
-

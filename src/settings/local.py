@@ -35,6 +35,3 @@ CORS_ALLOW_CREDENTIALS = True
 
 # You can also allow all origins in development (uncomment if needed)
 # CORS_ALLOW_ALL_ORIGINS = True
-
-# Update JWT to use this SECRET_KEY
-SIMPLE_JWT['SIGNING_KEY'] = SECRET_KEY

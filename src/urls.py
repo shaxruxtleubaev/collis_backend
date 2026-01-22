@@ -1,14 +1,13 @@
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.authtoken.views import obtain_auth_token
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # JWT AUTHENTICATION ENDPOINTS
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # TOKEN AUTHENTICATION ENDPOINT
+    path('api/login/', obtain_auth_token, name='api_login'),
     
     # API DOCUMENTATION (Swagger UI)
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

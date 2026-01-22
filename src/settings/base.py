@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     
     # Third party apps
     'rest_framework',
-    'rest_framework_simplejwt',
+    'rest_framework.authtoken',  # Added for Token Authentication
     'drf_spectacular',
     'corsheaders',
     'django_filters',
@@ -121,7 +121,50 @@ JAZZMIN_SETTINGS = {
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'EXCEPTION_HANDLER': 'timetable.utils.custom_exception_handler',
+}
+
+# ----------------------------------------
+# JAZZMIN ADMIN CUSTOMIZATION
+# ----------------------------------------
+
+JAZZMIN_SETTINGS = {
+    "site_title": "ColliS Timetable Admin",
+    "site_header": "ColliS",
+    "site_brand": "Scheduling System",
+    "welcome_sign": "Welcome to the ColliS Scheduling Administration Panel",
+    "copyright": "Timetable Management System",
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    "theme": "flatly", 
+    "show_ui_builder": False,
+    "order_with_respect_to": [
+        "auth",
+        "timetable",
+    ],
+}
+
+# ----------------------------------------
+# REST FRAMEWORK SETTINGS
+# ----------------------------------------
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -172,10 +215,11 @@ SPECTACULAR_SETTINGS = {
     },
     'SECURITY': [
         {
-            'Bearer': {
-                'type': 'http',
-                'scheme': 'bearer',
-                'bearerFormat': 'JWT',
+            'tokenAuth': {
+                'type': 'apiKey',
+                'in': 'header',
+                'name': 'Authorization',
+                'description': 'Token-based authentication with required prefix "Token"'
             }
         }
     ],
