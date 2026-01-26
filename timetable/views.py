@@ -188,6 +188,68 @@ class LecturerViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['lecturer_id', 'fullname']
     ordering = ['lecturer_id']
 
+    def get_permissions(self):
+        """
+        Override to allow lecturers to modify only their own lessons.
+        """
+        permission_classes = [IsAuthenticated]
+        
+        # For write operations (POST, PUT, PATCH, DELETE)
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes.append(IsStaffOrReadOnly)
+        
+        return [permission() for permission in permission_classes]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.is_authenticated and hasattr(self.request.user, 'userprofile'):
+            profile = self.request.user.userprofile
+            
+            # Filter for Students
+            if profile.user_type == 'STUDENT' and hasattr(self.request.user, 'student'):
+                return queryset.filter(groups=self.request.user.student.group)
+            
+            # Filter for Lecturers
+            elif profile.user_type == 'LECTURER' and hasattr(self.request.user, 'lecturer'):
+                return queryset.filter(lecturer=self.request.user.lecturer)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Lecturers can only create lessons for themselves"""
+        if (hasattr(self.request.user, 'userprofile') and 
+            self.request.user.userprofile.user_type == 'LECTURER'):
+            # Ensure lecturer is set to current user's lecturer
+            serializer.save(lecturer=self.request.user.lecturer)
+        else:
+            serializer.save()
+    
+    def perform_update(self, serializer):
+        """Lecturers can only update their own lessons"""
+        if (hasattr(self.request.user, 'userprofile') and 
+            self.request.user.userprofile.user_type == 'LECTURER'):
+            # Ensure lecturer cannot be changed by lecturer
+            instance = self.get_object()
+            if instance.lecturer != self.request.user.lecturer:
+                raise PermissionDenied("You can only update your own lessons.")
+            serializer.save()
+        else:
+            serializer.save()
+    
+    def perform_destroy(self, instance):
+        """Lecturers can only delete their own lessons"""
+        if (hasattr(self.request.user, 'userprofile') and 
+            self.request.user.userprofile.user_type == 'LECTURER'):
+            if instance.lecturer != self.request.user.lecturer:
+                raise PermissionDenied("You can only delete your own lessons.")
+        
+        from .utils import create_lesson_notification
+        # Create cancellation notification BEFORE deleting
+        create_lesson_notification(instance, 'CANCELLATION')
+        # Now delete the lesson
+        super().perform_destroy(instance)
+
 @extend_schema_view(
     list=extend_schema(description="List all students"),
     retrieve=extend_schema(description="Get student details"),

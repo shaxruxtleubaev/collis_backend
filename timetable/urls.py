@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .api_views import CustomObtainAuthToken  # Add this import
 
 router = DefaultRouter()
 
@@ -15,4 +16,6 @@ router.register(r'notifications', views.NotificationViewSet, basename='notificat
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Add custom token endpoint
+    path('token/', CustomObtainAuthToken.as_view(), name='api_token'),
 ]

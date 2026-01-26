@@ -37,3 +37,10 @@ class StudentLecturerAuthBackend(ModelBackend):
             return user
         
         return None
+
+    def get_user(self, user_id):
+        """Get user by ID - required for authentication backend"""
+        try:
+            return User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return None

@@ -59,27 +59,7 @@ class Lecturer(models.Model):
     def __str__(self):
         return f"{self.lecturer_id} - {self.fullname}"
     
-    def save(self, *args, **kwargs):
-        # Auto-create User and UserProfile only if this is a new lecturer
-        if not self.pk and not self.user:  # Check if this is a new instance
-            # Check if user already exists with this username
-            if not User.objects.filter(username=self.lecturer_id).exists():
-                # Create User with lecturer_id as username
-                user = User.objects.create_user(
-                    username=self.lecturer_id,
-                    email=self.email,
-                    password=self.lecturer_id  # Default password is lecturer_id
-                )
-                user.first_name = self.fullname.split()[0] if self.fullname else ''
-                user.last_name = ' '.join(self.fullname.split()[1:]) if len(self.fullname.split()) > 1 else ''
-                user.save()
-                
-                # Create UserProfile
-                UserProfile.objects.create(user=user, user_type='LECTURER')
-                
-                self.user = user
-        
-        super().save(*args, **kwargs)
+    # NO save() method here - handled in admin.py only
 
 class Student(models.Model):
     student_id = models.CharField(max_length=50, unique=True, primary_key=True)
@@ -93,27 +73,7 @@ class Student(models.Model):
     def __str__(self):
         return f"{self.student_id} - {self.fullname}"
     
-    def save(self, *args, **kwargs):
-        # Auto-create User and UserProfile only if this is a new student
-        if not self.pk and not self.user:  # Check if this is a new instance
-            # Check if user already exists with this username
-            if not User.objects.filter(username=self.student_id).exists():
-                # Create User with student_id as username
-                user = User.objects.create_user(
-                    username=self.student_id,
-                    email=self.email,
-                    password=self.student_id  # Default password is student_id
-                )
-                user.first_name = self.fullname.split()[0] if self.fullname else ''
-                user.last_name = ' '.join(self.fullname.split()[1:]) if len(self.fullname.split()) > 1 else ''
-                user.save()
-                
-                # Create UserProfile
-                UserProfile.objects.create(user=user, user_type='STUDENT')
-                
-                self.user = user
-        
-        super().save(*args, **kwargs)
+    # NO save() method here - handled in admin.py only
 
 class Lesson(models.Model):
     type_choices = [
