@@ -293,17 +293,6 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-created_at']
 
     def get_queryset(self):
-        """Filter notifications based on user type"""
-        user = self.request.user
-        
-        if hasattr(user, 'userprofile'):
-            profile = user.userprofile
-            
-            if profile.user_type == 'STUDENT' and hasattr(user, 'student'):
-                return self.queryset.filter(lesson__groups=user.student.group)
-            
-            elif profile.user_type == 'LECTURER' and hasattr(user, 'lecturer'):
-                return self.queryset.filter(lesson__lecturer=user.lecturer)
-        
-        # Admins see all
+        """Return all notifications for authenticated users"""
+        # All authenticated users see all notifications
         return self.queryset

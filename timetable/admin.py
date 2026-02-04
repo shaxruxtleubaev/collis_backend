@@ -328,7 +328,7 @@ class LessonAdmin(admin.ModelAdmin):
         from .utils import create_lesson_notification
         # Create notification BEFORE deleting
         create_lesson_notification(obj, 'CANCELLATION')
-        # Now delete the lesson
+        # Now delete the lesson (notifications stay in database)
         super().delete_model(request, obj)
     
     def delete_queryset(self, request, queryset):
@@ -337,7 +337,7 @@ class LessonAdmin(admin.ModelAdmin):
         # Create notifications for all lessons BEFORE deleting
         for obj in queryset:
             create_lesson_notification(obj, 'CANCELLATION')
-        # Now delete all lessons
+        # Now delete all lessons (notifications stay in database)
         super().delete_queryset(request, queryset)
 
 @admin.register(Notification)
