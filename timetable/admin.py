@@ -17,6 +17,26 @@ def generate_secure_password(length=12):
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
+
+class LecturerAwareAdminSite(admin.AdminSite):
+    """Custom admin site that enforces permissions for lecturers"""
+    
+    def has_permission(self, request):
+        """Check if user has permission to access admin"""
+        # Superusers always have permission
+        if request.user.is_superuser:
+            return True
+        
+        # Staff users (lecturers) with is_staff=True can access
+        if request.user.is_staff and request.user.is_active:
+            return True
+        
+        return False
+
+
+# Create custom admin site instance
+admin_site = LecturerAwareAdminSite(name='admin')
+
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     list_display = ('course_code', 'title', 'credits', 'created_at')
@@ -124,15 +144,18 @@ class LecturerAdmin(admin.ModelAdmin):
                 
                 # Set lecturer as staff (can access admin)
                 user.is_staff = True
+                user.is_active = True
                 user.first_name = obj.fullname.split()[0] if obj.fullname else ''
                 user.last_name = ' '.join(obj.fullname.split()[1:]) if len(obj.fullname.split()) > 1 else ''
                 user.save()
                 
-                # Give lecturer permissions to manage their own lessons
+                # Give lecturer ONLY lesson management permissions (view, add, change, delete)
                 lesson_content_type = ContentType.objects.get_for_model(Lesson)
-                lesson_permissions = Permission.objects.filter(content_type=lesson_content_type)
+                lesson_permissions = Permission.objects.filter(
+                    content_type=lesson_content_type,
+                    codename__in=['view_lesson', 'add_lesson', 'change_lesson', 'delete_lesson']
+                )
                 
-                # Add specific permissions: view, add, change, delete lessons
                 for perm in lesson_permissions:
                     user.user_permissions.add(perm)
                 
@@ -311,17 +334,78 @@ class LessonAdmin(admin.ModelAdmin):
     date_hierarchy = 'date'
     filter_horizontal = ('groups',)
     ordering = ('-date', '-starting_time')
+    readonly_fields = ()  # Initialize as empty tuple
     
     def get_queryset(self, request):
         """Limit lessons shown to lecturers (only their own lessons)"""
         qs = super().get_queryset(request)
+        
+        # Superusers see all lessons
+        if request.user.is_superuser:
+            return qs
         
         # If user is a lecturer, only show their lessons
         if request.user.is_authenticated and hasattr(request.user, 'userprofile'):
             if request.user.userprofile.user_type == 'LECTURER' and hasattr(request.user, 'lecturer'):
                 return qs.filter(lecturer=request.user.lecturer)
         
-        return qs
+        # Non-lecturers shouldn't see any lessons
+        return qs.none()
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make lecturer field read-only for non-superusers"""
+        readonly = ['lecturer'] if not request.user.is_superuser else []
+        return readonly
+    
+    def has_add_permission(self, request):
+        """Allow lecturers and admins to add lessons"""
+        if request.user.is_superuser:
+            return True
+        if request.user.is_staff and hasattr(request.user, 'lecturer'):
+            return True
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Allow deleting only own lessons (for lecturers)"""
+        if request.user.is_superuser:
+            return True
+        
+        # Lecturers can only delete their own lessons
+        if obj and hasattr(request.user, 'lecturer'):
+            return obj.lecturer == request.user.lecturer
+        
+        # If no specific object, check if user is a lecturer
+        if hasattr(request.user, 'lecturer'):
+            return True
+        
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        """Allow editing only own lessons (for lecturers)"""
+        if request.user.is_superuser:
+            return True
+        
+        # Lecturers can only edit their own lessons
+        if obj and hasattr(request.user, 'lecturer'):
+            return obj.lecturer == request.user.lecturer
+        
+        # If no specific object, check if user is a lecturer
+        if hasattr(request.user, 'lecturer'):
+            return True
+        
+        return False
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-set lecturer to the logged-in lecturer if they're not superuser"""
+        if not request.user.is_superuser and hasattr(request.user, 'lecturer'):
+            obj.lecturer = request.user.lecturer
+        
+        super().save_model(request, obj, form, change)
+        
+        # Create notification if this is an update (not a new lesson)
+        if change:
+            from .utils import create_lesson_notification
+            create_lesson_notification(obj, 'RESCHEDULE')
     
     def delete_model(self, request, obj):
         """Override to create notification before deletion"""

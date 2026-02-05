@@ -110,40 +110,63 @@ JAZZMIN_SETTINGS = {
     "default_icon_children": "fas fa-circle",
     "theme": "flatly", 
     "show_ui_builder": False,
-    "order_with_respect_to": [
-        "auth",
-        "timetable",
-    ],
-}
-
-# ----------------------------------------
-# REST FRAMEWORK SETTINGS
-# ----------------------------------------
-
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-}
-
-# ----------------------------------------
-# JAZZMIN ADMIN CUSTOMIZATION
-# ----------------------------------------
-
-JAZZMIN_SETTINGS = {
-    "site_title": "ColliS Timetable Admin",
-    "site_header": "ColliS",
-    "site_brand": "Scheduling System",
-    "welcome_sign": "Welcome to the ColliS Scheduling Administration Panel",
-    "copyright": "Timetable Management System",
-    "default_icon_parents": "fas fa-chevron-circle-right",
-    "default_icon_children": "fas fa-circle",
-    "theme": "flatly", 
-    "show_ui_builder": False,
-    "order_with_respect_to": [
-        "auth",
-        "timetable",
+    "show_search": True,
+    "navigation": [
+        {
+            "title": "Timetable Management",
+            "items": [
+                {
+                    "name": "lesson",
+                    "admin_url": "timetable/lesson/",
+                    "permissions": ["timetable.view_lesson"],
+                },
+                {
+                    "name": "course",
+                    "admin_url": "timetable/course/",
+                    "permissions": ["timetable.view_course"],
+                },
+                {
+                    "name": "group",
+                    "admin_url": "timetable/group/",
+                    "permissions": ["timetable.view_group"],
+                },
+                {
+                    "name": "room",
+                    "admin_url": "timetable/room/",
+                    "permissions": ["timetable.view_room"],
+                },
+            ],
+        },
+        {
+            "title": "User Management",
+            "items": [
+                {
+                    "name": "user",
+                    "admin_url": "auth/user/",
+                    "permissions": ["auth.view_user"],
+                },
+                {
+                    "name": "lecturer",
+                    "admin_url": "timetable/lecturer/",
+                    "permissions": ["timetable.view_lecturer"],
+                },
+                {
+                    "name": "student",
+                    "admin_url": "timetable/student/",
+                    "permissions": ["timetable.view_student"],
+                },
+            ],
+        },
+        {
+            "title": "System",
+            "items": [
+                {
+                    "name": "notification",
+                    "admin_url": "timetable/notification/",
+                    "permissions": ["timetable.view_notification"],
+                },
+            ],
+        },
     ],
 }
 

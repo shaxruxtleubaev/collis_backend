@@ -52,10 +52,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
     user_type_display = serializers.CharField(source='get_user_type_display', read_only=True)
     fullname = serializers.SerializerMethodField()
     user_id = serializers.SerializerMethodField()
+    group_name = serializers.SerializerMethodField()
     
     class Meta:
         model = UserProfile
-        fields = ['id', 'username', 'email', 'user_type', 'user_type_display', 'fullname', 'user_id']
+        fields = ['id', 'username', 'email', 'user_type', 'user_type_display', 'fullname', 'user_id', 'group_name']
         read_only_fields = ['id']
     
     def get_fullname(self, obj):
@@ -72,6 +73,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return obj.user.lecturer.lecturer_id
         elif obj.user_type == 'STUDENT' and hasattr(obj.user, 'student'):
             return obj.user.student.student_id
+        return None
+    
+    def get_group_name(self, obj):
+        """Get student's group name"""
+        if obj.user_type == 'STUDENT' and hasattr(obj.user, 'student'):
+            if obj.user.student.group:
+                return obj.user.student.group.name
         return None
 
 class LessonSerializer(serializers.ModelSerializer):
