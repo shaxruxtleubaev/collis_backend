@@ -1,7 +1,8 @@
-from rest_framework import viewsets, generics, status, filters
+from rest_framework import viewsets, generics, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from .serializers import (
@@ -296,3 +297,60 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         """Return all notifications for authenticated users"""
         # All authenticated users see all notifications
         return self.queryset
+    
+    @extend_schema(
+        description="Mark a notification as read for the current user",
+        responses={200: {"description": "Notification marked as read"}}
+    )
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """Mark notification as read for current user"""
+        from .models import NotificationRead
+        notification = self.get_object()
+        
+        # Create or get NotificationRead entry
+        read_entry, created = NotificationRead.objects.get_or_create(
+            notification=notification,
+            user=request.user
+        )
+        
+        message = "Notification marked as read" if created else "Notification already marked as read"
+        return Response(
+            {'message': message, 'read_at': read_entry.read_at},
+            status=status.HTTP_200_OK
+        )
+    
+    @extend_schema(
+        description="Get count of unread notifications for current user",
+        responses={200: {"type": "object", "properties": {"unread_count": {"type": "integer"}}}}
+    )
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get unread notification count for current user"""
+        from .models import NotificationRead
+        
+        # Get all relevant notifications for this user
+        queryset = self.get_queryset()
+        
+        # If student, filter by their group
+        if (hasattr(request.user, 'userprofile') and 
+            request.user.userprofile.user_type == 'STUDENT' and 
+            hasattr(request.user, 'student')):
+            # Filter notifications for student's group
+            group_name = request.user.student.group.name
+            queryset = queryset.extra(
+                where=[f"group_names LIKE %s"],
+                params=[f"%{group_name}%"]
+            )
+        
+        # Count unread (not in NotificationRead table)
+        all_notification_ids = set(queryset.values_list('id', flat=True))
+        read_notification_ids = set(
+            NotificationRead.objects.filter(user=request.user).values_list('notification_id', flat=True)
+        )
+        unread_ids = all_notification_ids - read_notification_ids
+        
+        return Response(
+            {'unread_count': len(unread_ids)},
+            status=status.HTTP_200_OK
+        )

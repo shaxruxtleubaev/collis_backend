@@ -174,6 +174,7 @@ class LessonSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     lesson_details = serializers.SerializerMethodField()
     message_type_display = serializers.CharField(source='get_message_type_display', read_only=True)
+    is_read = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
@@ -181,9 +182,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             'id', 'lesson', 'lesson_details',
             'course_code', 'course_title', 'lesson_date', 'lesson_time', 'group_names',
             'message_type', 'message_type_display', 'message_text', 
-            'is_sent', 'created_at'
+            'is_sent', 'is_read', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at', 'lesson_details', 'message_type_display']
+        read_only_fields = ['id', 'created_at', 'lesson_details', 'message_type_display', 'is_read']
     
     def get_lesson_details(self, obj):
         """Return lesson details if lesson still exists, otherwise use stored data"""
@@ -207,6 +208,18 @@ class NotificationSerializer(serializers.ModelSerializer):
                 'time': obj.lesson_time,
                 'deleted': True
             }
+    
+    def get_is_read(self, obj):
+        """Check if current user has read this notification"""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        
+        from .models import NotificationRead
+        return NotificationRead.objects.filter(
+            notification=obj,
+            user=request.user
+        ).exists()
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True, write_only=True)
