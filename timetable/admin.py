@@ -6,7 +6,7 @@ from django.utils.html import format_html
 from .models import (
     Course, Group, Room,
     Lecturer, Student, UserProfile,
-    Lesson, Notification, NotificationRead
+    Lesson, Notification
 )
 from .utils import create_lesson_notification 
 import secrets
@@ -426,19 +426,9 @@ class LessonAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('message_type', 'lesson', 'is_sent', 'created_at')
-    list_filter = ('message_type', 'is_sent', 'created_at')
+    list_display = ('message_type', 'lesson', 'is_sent', 'is_read', 'created_at')
+    list_filter = ('message_type', 'is_sent', 'is_read', 'created_at')
     search_fields = ('message_text', 'lesson__course__title', 'lesson__course__course_code')
     readonly_fields = ('created_at',)
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
-
-
-@admin.register(NotificationRead)
-class NotificationReadAdmin(admin.ModelAdmin):
-    list_display = ('user', 'notification', 'read_at')
-    list_filter = ('read_at',)
-    search_fields = ('user__username', 'notification__message_text')
-    readonly_fields = ('read_at', 'notification', 'user')
-    date_hierarchy = 'read_at'
-    ordering = ('-read_at',)

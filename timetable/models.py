@@ -122,6 +122,7 @@ class Notification(models.Model):
     message_type = models.CharField(max_length=20, choices=type_choices)
     message_text = models.TextField()
     is_sent = models.BooleanField(default=False)
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -129,20 +130,3 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.message_type} - {self.course_code} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
-
-
-class NotificationRead(models.Model):
-    """Track which students have read which notifications"""
-    notification = models.ForeignKey(Notification, on_delete=models.CASCADE, related_name='reads')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notification_reads')
-    read_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ['notification', 'user']
-        indexes = [
-            models.Index(fields=['user', 'read_at']),
-            models.Index(fields=['notification']),
-        ]
-
-    def __str__(self):
-        return f"{self.user.username} read {self.notification.id}"
