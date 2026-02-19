@@ -20,11 +20,11 @@ ALLOWED_HOSTS = ['*']
 #     'your-custom-domain.com',
 # ]
 
-# Database - SQLite for production (as requested)
+# Database - SQLite for production (separate from local)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'production.sqlite3',
     }
 }
 
