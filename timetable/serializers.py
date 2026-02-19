@@ -215,11 +215,16 @@ class NotificationSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         
-        from .models import NotificationRead
-        return NotificationRead.objects.filter(
-            notification=obj,
-            user=request.user
-        ).exists()
+        try:
+            from .models import NotificationRead
+            return NotificationRead.objects.filter(
+                notification=obj,
+                user=request.user
+            ).exists()
+        except Exception as e:
+            # If NotificationRead table doesn't exist or other error, return False
+            # This allows the system to work during migration
+            return False
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True, write_only=True)
