@@ -276,9 +276,9 @@ class StudentViewSet(viewsets.ReadOnlyModelViewSet):
     ),
     retrieve=extend_schema(description="Get notification details"),
 )
-class NotificationViewSet(viewsets.ModelViewSet):
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    ViewSet for managing notifications.
+    ViewSet for viewing notifications.
     
     Personalized filtering:
     - Students: See notifications for their group's lessons
@@ -289,7 +289,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['message_type', 'is_sent', 'is_read']
+    filterset_fields = ['message_type', 'is_sent']
     ordering_fields = ['created_at']
     ordering = ['-created_at']
 
@@ -297,9 +297,3 @@ class NotificationViewSet(viewsets.ModelViewSet):
         """Return all notifications for authenticated users"""
         # All authenticated users see all notifications
         return self.queryset
-    
-    def get_permissions(self):
-        """Allow marking notifications as read"""
-        if self.action in ['partial_update', 'update']:
-            return [IsAuthenticated()]
-        return [IsAuthenticated()]

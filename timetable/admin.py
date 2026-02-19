@@ -426,8 +426,8 @@ class LessonAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('message_type', 'lesson', 'is_sent', 'is_read', 'created_at')
-    list_filter = ('message_type', 'is_sent', 'is_read', 'created_at')
+    list_display = ('message_type', 'lesson', 'is_sent', 'created_at')
+    list_filter = ('message_type', 'is_sent', 'created_at')
     search_fields = ('message_text', 'lesson__course__title', 'lesson__course__course_code')
     readonly_fields = ('created_at',)
     date_hierarchy = 'created_at'
