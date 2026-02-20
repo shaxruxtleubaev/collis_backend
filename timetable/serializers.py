@@ -181,7 +181,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'id', 'lesson', 'lesson_details',
             'course_code', 'course_title', 'lesson_date', 'lesson_time', 'group_names',
             'message_type', 'message_type_display', 'message_text', 
-            'is_sent', 'created_at'
+            'is_sent', 'is_read', 'created_at'
         ]
         read_only_fields = ['id', 'created_at', 'lesson_details', 'message_type_display']
     
